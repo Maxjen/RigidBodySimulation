@@ -149,10 +149,15 @@ Vec3 RigidBody::getEdgePoint(int i)
 	XMVECTOR orientationQuaternion = XMLoadFloat4(&orientation);
 	XMMATRIX rot = XMMatrixRotationQuaternion(orientationQuaternion);
 	XMVECTOR resultVector = XMLoadFloat3(&result);
-	resultVector = XMVector3Transform(resultVector, trans * rot);
+	resultVector = XMVector3Transform(resultVector, rot * trans);
 	XMStoreFloat3(&result, resultVector);
 	
 	return Vec3(result.x, result.y, result.z);
+}
+
+void RigidBody::setOrientation(XMFLOAT4 orientation)
+{
+	this->orientation = orientation;
 }
 
 XMFLOAT4 RigidBody::getOrientation()

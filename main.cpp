@@ -263,8 +263,8 @@ void DrawRigidBodies(ID3D11DeviceContext* pd3dImmediateContext)
 		XMMATRIX rot = XMMatrixRotationQuaternion(orientationQuaternion);
 
         //g_pEffectPositionNormal->SetWorld(scale * trans * rot * g_camera.GetWorldMatrix());
-		//g_pEffectPositionNormal->SetWorld(scale * trans * rot * g_camera.GetWorldMatrix());
-		g_pEffectPositionNormal->SetWorld(scale * trans * rot);
+		//g_pEffectPositionNormal->SetWorld(scale * trans * rot);
+		g_pEffectPositionNormal->SetWorld(scale * rot * trans);
 
         // Draw
         // NOTE: The following generates one draw call per object, so performance will be bad for n>>1000 or so
@@ -786,10 +786,18 @@ int main(int argc, char* argv[])
 	RigidBody b1(0, 0, 0);
 	rigidBodies.push_back(b1);
 
+	XMVECTOR r = XMQuaternionRotationAxis(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), 3.14159265f/4);
+	XMFLOAT4 rr;
+	rr.x = XMVectorGetX(r);
+	rr.y = XMVectorGetY(r);
+	rr.z = XMVectorGetZ(r);
+	rr.w = XMVectorGetW(r);
+
 	RigidBody b2(0, 1.0f, 0);
 	b2.setWidth(0.5f);
 	b2.setLength(0.5f);
 	b2.setHeight(0.5f);
+	b2.setOrientation(rr);
 	rigidBodies.push_back(b2);
 
 	/*RigidBody b1(0, 0, 0);

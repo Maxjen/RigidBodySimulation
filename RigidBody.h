@@ -42,6 +42,7 @@ public:
 
 	Vec3 getEdgePoint(int index);
 
+	void setOrientation(XMFLOAT4 orientation);
 	XMFLOAT4 getOrientation();
 
 	float getRayIntersection(const Vec3 &rayStart, const Vec3 &rayDirection);
