@@ -220,39 +220,7 @@ float RigidBody::getRayIntersection(const Vec3 &rayStart, const Vec3 &rayDirecti
 {
 	Vec3 vertices[8];
 	for (int i = 0; i < 8; i++)
-		vertices[i] = position;
-
-	vertices[0].x -= width / 2;
-	vertices[0].y -= height / 2;
-	vertices[0].z += length / 2;
-
-	vertices[1].x += width / 2;
-	vertices[1].y -= height / 2;
-	vertices[1].z += length / 2;
-
-	vertices[2].x += width / 2;
-	vertices[2].y += height / 2;
-	vertices[2].z += length / 2;
-
-	vertices[3].x -= width / 2;
-	vertices[3].y += height / 2;
-	vertices[3].z += length / 2;
-
-	vertices[4].x -= width / 2;
-	vertices[4].y -= height / 2;
-	vertices[4].z -= length / 2;
-
-	vertices[5].x += width / 2;
-	vertices[5].y -= height / 2;
-	vertices[5].z -= length / 2;
-
-	vertices[6].x += width / 2;
-	vertices[6].y += height / 2;
-	vertices[6].z -= length / 2;
-
-	vertices[7].x -= width / 2;
-	vertices[7].y += height / 2;
-	vertices[7].z -= length / 2;
+		vertices[i] = getEdgePoint(i);
 
 	float results[6];
 	results[0] = rayFaceIntersection(rayStart, rayDirection, vertices[0], vertices[1], vertices[2], vertices[3]);
@@ -270,23 +238,6 @@ float RigidBody::getRayIntersection(const Vec3 &rayStart, const Vec3 &rayDirecti
 	}
 
 	return (result < 100.0f) ? result : 100.0f;
-
-	/*Vec3 v0, v1, v2;
-	v0 = v1 = v2 = position;
-
-	v0.x -= width / 2;
-	v0.y -= height / 2;
-	v0.z += length / 2;
-
-	v1.x += width / 2;
-	v1.y -= height / 2;
-	v1.z += length / 2;
-
-	v2.x += width / 2;
-	v2.y += height / 2;
-	v2.z += length / 2;
-
-	return rayTriangleIntersection(rayStart, rayDirection, v0, v1, v2);*/
 }
 
 void RigidBody::step()
