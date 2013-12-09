@@ -30,6 +30,7 @@ using namespace DirectX;
 #include <vector>
 
 #include "RigidBody.h"
+#include "Contact.h"
 
 using namespace std;
 
@@ -42,6 +43,8 @@ float tanFOV;
 vector<RigidBody> rigidBodies;
 int selectedRigidBody = -1;
 float selectedRigidBodyDepth;
+
+vector<Contact> contacts;
 
 enum ActionMode {SELECT, GRAB, ROTATE};
 ActionMode actionMode = SELECT;
@@ -86,6 +89,29 @@ float g_fSphereSize    = 0.05f;
 bool  g_bDrawTeapot    = true;
 bool  g_bDrawTriangle  = false;
 bool  g_bDrawSpheres   = true;
+
+XMFLOAT3 rotateByQuaternion(XMFLOAT3 v, XMFLOAT4 q)
+{
+	XMVECTOR vector = XMLoadFloat3(&v);
+	XMVECTOR quaternion = XMLoadFloat4(&q);
+	XMMATRIX rot = XMMatrixRotationQuaternion(quaternion);
+	vector = XMVector3TransformNormal(vector, rot);
+	XMFLOAT3 result;
+	XMStoreFloat3(&result, vector);
+	return result;
+}
+
+XMFLOAT3 rotateByQuaternionInverse(XMFLOAT3 v, XMFLOAT4 q)
+{
+	XMVECTOR vector = XMLoadFloat3(&v);
+	XMVECTOR quaternion = XMLoadFloat4(&q);
+	quaternion = XMQuaternionInverse(quaternion);
+	XMMATRIX rot = XMMatrixRotationQuaternion(quaternion);
+	vector = XMVector3TransformNormal(vector, rot);
+	XMFLOAT3 result;
+	XMStoreFloat3(&result, vector);
+	return result;
+}
 
 // Create TweakBar and add required buttons and variables
 void InitTweakBar(ID3D11Device* pd3dDevice)
@@ -474,7 +500,6 @@ void OnMouseSelect(bool bLeftButtonDown, bool &leftMousePressed, int xPos, int y
 		XMStoreFloat3(&testF, testV);
 		printf("%f %f %f\n", testF.x, testF.y, testF.z);*/
 
-
 		float dx = tanFOV * (2 * ((float)xPos)/screenWidth - 1.0f)*(((float)screenWidth)/screenHeight);
 		float dy = tanFOV * (1.0f - 2 * ((float)yPos)/screenHeight);
 		float nearPlane = 0.1f;
@@ -504,7 +529,7 @@ void OnMouseSelect(bool bLeftButtonDown, bool &leftMousePressed, int xPos, int y
 			rayDirection.normalize();
 
 			float t = rigidBodies[i].getRayIntersection(rayStart, rayDirection);
-			printf("RigidBody %d, t = %f\n", i, t);
+			//printf("RigidBody %d, t = %f\n", i, t);
 			if (t != -1.0f && t < currentMinDistance)
 			{
 				currentMinDistance = t;
@@ -531,6 +556,7 @@ void OnMouseGrab(bool bLeftButtonDown, int xPosSave, int yPosSave, int xPos, int
 		float dy = tanFOV * (2 * (((float)screenHeight)/2 + 1)/screenHeight - 1.0f);
 		XMFLOAT3 relXFloat(dx * selectedRigidBodyDepth, 0, 0);
 		XMFLOAT3 relYFloat(0, dy * selectedRigidBodyDepth, 0);
+		printf("%f\n", selectedRigidBodyDepth);
 		XMVECTOR relXVector = XMLoadFloat3(&relXFloat);
 		XMVECTOR relYVector = XMLoadFloat3(&relYFloat);
 		XMMATRIX viewInv = XMMatrixInverse(nullptr, g_camera.GetViewMatrix());
@@ -540,6 +566,35 @@ void OnMouseGrab(bool bLeftButtonDown, int xPosSave, int yPosSave, int xPos, int
 		Vec3 relYVec3(XMVectorGetX(relYVector), XMVectorGetY(relYVector), XMVectorGetZ(relYVector));
 		Vec3 deltaPosition = (xPos - xPosSave) * relXVec3 + (yPos - yPosSave) * (-relYVec3);
 		rigidBodies[selectedRigidBody].translate(deltaPosition.x, deltaPosition.y, deltaPosition.z);
+
+
+
+		/*float nearPlane = 0.1f;
+		XMMATRIX viewInv = XMMatrixInverse(nullptr, g_camera.GetViewMatrix());
+
+		float dx1 = tanFOV * (2 * ((float)xPos)/screenWidth - 1.0f)*(((float)screenWidth)/screenHeight);
+		float dy1 = tanFOV * (1.0f - 2 * ((float)yPos)/screenHeight);
+		XMFLOAT3 p1Near(dx1 * nearPlane, dy1 * nearPlane, nearPlane);
+		XMFLOAT3 p1Far(dx1 * selectedRigidBodyDepth, dy1 * selectedRigidBodyDepth, selectedRigidBodyDepth);
+		XMVECTOR p1NearV = XMLoadFloat3(&p1Near);
+		XMVECTOR p1FarV = XMLoadFloat3(&p1Far);
+		p1NearV = XMVector3Transform(p1NearV, viewInv);
+		p1FarV = XMVector3Transform(p1FarV, viewInv);
+		Vec3 p1NearV3(XMVectorGetX(p1NearV), XMVectorGetY(p1NearV), XMVectorGetZ(p1NearV));
+		Vec3 p1FarV3(XMVectorGetX(p1FarV), XMVectorGetY(p1FarV), XMVectorGetZ(p1FarV));
+
+		float dx2 = tanFOV * (2 * ((float)xPos)/screenWidth - 1.0f)*(((float)screenWidth)/screenHeight);
+		float dy2 = tanFOV * (1.0f - 2 * ((float)yPos)/screenHeight);
+		XMFLOAT3 p2Near(dx2 * nearPlane, dy2 * nearPlane, nearPlane);
+		XMFLOAT3 p2Far(dx2 * selectedRigidBodyDepth, dy2 * selectedRigidBodyDepth, selectedRigidBodyDepth);
+		XMVECTOR p2NearV = XMLoadFloat3(&p1Near);
+		XMVECTOR p2FarV = XMLoadFloat3(&p1Far);
+		p2NearV = XMVector3Transform(p1NearV, viewInv);
+		p2FarV = XMVector3Transform(p1FarV, viewInv);
+		Vec3 p2NearV3(XMVectorGetX(p2NearV), XMVectorGetY(p2NearV), XMVectorGetZ(p2NearV));
+		Vec3 p2FarV3(XMVectorGetX(p2FarV), XMVectorGetY(p2FarV), XMVectorGetZ(p2FarV));
+
+		float d = distance(p1FarV3, p2FarV3);*/
 	}
 	if (bLeftButtonDown)
 		actionMode = SELECT;
@@ -691,53 +746,178 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 	timeAcc += fElapsedTime;
 	while (timeAcc >= timeStep)
 	{
+		contacts.clear();
+
+		// set color of every body to default color
+		for (unsigned int i = 0; i < rigidBodies.size(); i++)
+			rigidBodies[i].setColor(0.5f, 0.5f, 0.5f);
+
 		for (unsigned int i = 0; i < rigidBodies.size(); i++)
 		{
 			for (unsigned int j = i + 1; j < rigidBodies.size(); j++)
 			{
+				// check each edgePoint of body j for collision with body i
 				bool collision = false;
 				for (int k = 0; k < 8; k++)
 				{
+					// transform edgePoint into object space of body i
 					Vec3 edgePoint = rigidBodies[j].getEdgePoint(k);
 					edgePoint -= rigidBodies[i].getPosition();
-					XMFLOAT4 orientation = rigidBodies[i].getOrientation();
-					XMVECTOR orientationQuaternion = XMLoadFloat4(&orientation);
-					orientationQuaternion = XMQuaternionInverse(orientationQuaternion);
-					XMMATRIX rot = XMMatrixRotationQuaternion(orientationQuaternion);
 					XMFLOAT3 edgePointF;
 					edgePointF.x = edgePoint.x;
 					edgePointF.y = edgePoint.y;
 					edgePointF.z = edgePoint.z;
-					XMVECTOR edgePointV = XMLoadFloat3(&edgePointF);
-					XMVector3TransformNormal(edgePointV, rot);
-					XMStoreFloat3(&edgePointF, edgePointV);
+					rotateByQuaternionInverse(edgePointF, rigidBodies[i].getOrientation());
 
+					// check for collision
 					float width = rigidBodies[i].getWidth();
 					float height = rigidBodies[i].getHeight();
 					float length = rigidBodies[i].getLength();
-					if ((edgePoint.x >= -0.5 * width) && (edgePoint.x <= 0.5 * width) &&
-						(edgePoint.y >= -0.5 * height) && (edgePoint.y <= 0.5 * height) &&
-						(edgePoint.z >= -0.5 * length) && (edgePoint.z <= 0.5 * length))
+					if ((edgePoint.x >= -0.5f * width) && (edgePoint.x <= 0.5f * width) &&
+						(edgePoint.y >= -0.5f * height) && (edgePoint.y <= 0.5f * height) &&
+						(edgePoint.z >= -0.5f * length) && (edgePoint.z <= 0.5f * length))
+					{
 						collision = true;
-					printf("Body %d Point %d: %f %f %f\n", j, k, edgePoint.x, edgePoint.y, edgePoint.z);
+
+						float minDistToFaceX, minDistToFaceY, minDistToFaceZ;
+						if (edgePoint.x < 0)
+							minDistToFaceX = 0.5f * width  + edgePoint.x;
+						else
+							minDistToFaceX = -0.5f * width + edgePoint.x;
+						if (edgePoint.y < 0)
+							minDistToFaceY = 0.5f * height  + edgePoint.y;
+						else
+							minDistToFaceY = -0.5f * height + edgePoint.y;
+						if (edgePoint.z < 0)
+							minDistToFaceZ = 0.5f * height  + edgePoint.z;
+						else
+							minDistToFaceZ = -0.5f * height + edgePoint.z;
+
+						Vec3 collisionNormal;
+						float minDistanceToFace;
+						if (fabs(minDistToFaceX) <= fabs(minDistToFaceY) && fabs(minDistToFaceX) <= fabs(minDistToFaceZ))
+						{
+							minDistanceToFace = minDistToFaceX;
+							collisionNormal = Vec3(1.0f, 0.0f, 0.0f);
+						}
+						else if (fabs(minDistToFaceY) <= fabs(minDistToFaceX) && fabs(minDistToFaceY) <= fabs(minDistToFaceZ))
+						{
+							minDistanceToFace = minDistToFaceY;
+							collisionNormal = Vec3(0.0f, 1.0f, 0.0f);
+						}
+						else if (fabs(minDistToFaceZ) <= fabs(minDistToFaceX) && fabs(minDistToFaceZ) <= fabs(minDistToFaceY))
+						{
+							minDistanceToFace = minDistToFaceZ;
+							collisionNormal = Vec3(0.0f, 0.0f, 1.0f);
+						}
+
+						float collisionDepth;
+						if (minDistanceToFace > 0)
+						{
+							collisionDepth = -minDistanceToFace;
+							collisionNormal *= -1;
+						}
+						else
+						{
+							collisionDepth = minDistanceToFace;
+							// to trivial to get the privilege from the compiler
+							//collisionNormal *= 1;
+						}
+
+						// rotate collisionNormal
+						XMFLOAT3 collisionNormalF;
+						collisionNormalF.x = collisionNormal.x;
+						collisionNormalF.y = collisionNormal.y;
+						collisionNormalF.z = collisionNormal.z;
+						rotateByQuaternion(collisionNormalF, rigidBodies[i].getOrientation());
+
+						Contact newContact;
+						newContact.position = rigidBodies[j].getEdgePoint(k);
+						newContact.normal = collisionNormal;
+						newContact.depth = collisionDepth;
+						newContact.bodyI = i;
+						newContact.bodyJ = j;
+						Vec3 vI = rigidBodies[i].getVelocityAtPosition(newContact.position + newContact.normal * (-newContact.depth));
+						Vec3 vJ = rigidBodies[j].getVelocityAtPosition(newContact.position);
+						
+						float vRel = newContact.normal * (vJ - vI);
+						newContact.vRel = vRel;
+						contacts.push_back(newContact);
+					}
 				}
+				// if bodies i and j collide, color them red
 				if (collision)
 				{
 					rigidBodies[i].setColor(1.0f, 0.0f, 0.0f);
 					rigidBodies[j].setColor(1.0f, 0.0f, 0.0f);
-					printf("Collision between %d and %d.\n", i, j);
-				}
-				else
-				{
-					rigidBodies[i].setColor(0.5f, 0.5f, 0.5f);
-					rigidBodies[j].setColor(0.5f, 0.5f, 0.5f);
+					// printf("Collision between %d and %d.\n", i, j);
 				}
 			}
 		}
-		/*for (unsigned int i = 0; i < rigidBodies.size(); i++)
+		for (unsigned int i = 0; i < rigidBodies.size(); i++)
 		{
-			rigidBodies[i].step();
-		}*/
+			rigidBodies[i].clearForce();
+			rigidBodies[i].clearTorque();
+		}
+		for (unsigned int i = 0; i < contacts.size(); i++)
+		{
+			// value of constant chosen, because J. Carmack said so
+			float restitution = 0.5f;
+
+			// compute dividend
+			Vec3 vRelVec3 = contacts[i].vRel * contacts[i].normal;
+			float dividend = -(1 + restitution) * vRelVec3 * contacts[i].normal;
+
+			Vec3 positionI, positionJ;
+			positionI = contacts[i].position + contacts[i].normal * (-contacts[i].depth);
+			positionJ = contacts[i].position;
+
+			// convert normal for valid computation of impulse
+			XMFLOAT3 normal;
+			normal.x = contacts[i].normal.x;
+			normal.y = contacts[i].normal.y;
+			normal.z = contacts[i].normal.z;
+			XMVECTOR normalVector = XMLoadFloat3(&normal);
+
+			// preliminary computation of impulse (part body J)
+			XMFLOAT3X3 inertiaTensorInverseJFloat = rigidBodies[contacts[i].bodyJ].computeInertiaTensorInverse();
+			XMMATRIX inertiaTensorInverseJ = XMLoadFloat3x3(&inertiaTensorInverseJFloat);
+			XMFLOAT3 positionJFloat;
+			positionJFloat.x = positionJ.x;
+			positionJFloat.y = positionJ.y;
+			positionJFloat.z = positionJ.z;
+			XMVECTOR positionJVector = XMLoadFloat3(&positionJFloat);
+			XMVECTOR summandJ = XMVector3Cross(positionJVector, normalVector);
+			summandJ = XMVector3TransformNormal(summandJ, inertiaTensorInverseJ);
+			summandJ = XMVector3Cross(summandJ, positionJVector);
+
+			// preliminary computation of impulse (part body I)
+			XMFLOAT3X3 inertiaTensorInverseIFloat = rigidBodies[contacts[i].bodyI].computeInertiaTensorInverse();
+			XMMATRIX inertiaTensorInverseI = XMLoadFloat3x3(&inertiaTensorInverseIFloat);
+			XMFLOAT3 positionIFloat;
+			positionIFloat.x = positionI.x;
+			positionIFloat.y = positionI.y;
+			positionIFloat.z = positionI.z;
+			XMVECTOR positionIVector = XMLoadFloat3(&positionIFloat);
+			XMVECTOR summandI = XMVector3Cross(positionIVector, normalVector);
+			summandI = XMVector3TransformNormal(summandI, inertiaTensorInverseI);
+			summandI = XMVector3Cross(summandI, positionIVector);
+			
+			// compute divisor
+			XMVECTOR sum = XMVectorAdd(summandJ, summandI);
+			float divisor = XMVectorGetX(XMVector3Dot(sum, normalVector));
+			divisor += rigidBodies[contacts[i].bodyI].getMassInverse() + rigidBodies[contacts[i].bodyJ].getMassInverse();
+
+			float impulse = dividend/divisor;
+
+			rigidBodies[contacts[i].bodyI].updateVnL(-impulse, contacts[i].normal, positionI);
+			rigidBodies[contacts[i].bodyJ].updateVnL(impulse, contacts[i].normal, positionJ);
+		}
+		for (unsigned int i = 0; i < rigidBodies.size(); i++)
+		{
+			rigidBodies[i].eulerStep();
+		}
+
 
 		timeAcc -= timeStep;
 
@@ -784,6 +964,7 @@ int main(int argc, char* argv[])
 	tanFOV = tanf(XM_PI / 8.0f);
 
 	RigidBody b1(0, 0, 0);
+	b1.setIsFixed(true);
 	rigidBodies.push_back(b1);
 
 	XMVECTOR r = XMQuaternionRotationAxis(XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f), 3.14159265f/4);
